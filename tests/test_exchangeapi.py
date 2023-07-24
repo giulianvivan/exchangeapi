@@ -1,8 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
+from freezegun import freeze_time
 from flask import Flask
 from flask.testing import FlaskClient
-from exchangeapi import app
+from exchangeapi import app, dbh
+from database import DatabaseHandler
+
+TRANSACTION_ID = 123
 
 class TestConversionEndpoint(unittest.TestCase):
     def setUp(self):
@@ -10,6 +14,9 @@ class TestConversionEndpoint(unittest.TestCase):
         self.mock_get_exchange_rate = MagicMock(return_value=1.4)
         self.mock_get_exchange_rate_failure = MagicMock(return_value=None)
 
+    @freeze_time("2023-07-24 22:30:00", tz_offset=-3)
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_success(self):
         # Prepare the test data
         test_data = {
@@ -24,9 +31,10 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 200)
             response_data = response.get_json()
-            self.assertIn('transaction_id', response_data)
+            self.assertEqual(response_data['transaction_id'], TRANSACTION_ID)
             self.assertEqual(response_data['user_id'], test_data['user_id'])
             self.assertEqual(response_data['source_currency'], test_data['source_currency'])
             self.assertEqual(response_data['amount'], test_data['amount'])
@@ -35,6 +43,18 @@ class TestConversionEndpoint(unittest.TestCase):
             self.assertEqual(response_data['exchange_rate'], 1.4)
             self.assertIsNotNone(response_data['timestamp'])
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_called_once_with(test_data['user_id'],
+                                                           test_data['source_currency'],
+                                                           test_data['amount'],
+                                                           test_data['target_currency'],
+                                                           140,
+                                                           1.4,
+                                                           '2023-07-24T19:30:00Z')
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_invalid_user(self):
         # Prepare the test data
         test_data = {
@@ -49,10 +69,17 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'user id "0" is not allowed!')
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_negative_amount(self):
         # Prepare the test data
         test_data = {
@@ -67,10 +94,17 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'Invalid amount. amount must be a positive number')
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_zero_amount(self):
         # Prepare the test data
         test_data = {
@@ -85,10 +119,17 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'Invalid amount. amount must be a positive number')
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_source_currency_not_supported(self):
         # Prepare the test data
         test_data = {
@@ -103,10 +144,17 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'WTF is not supported!')
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_target_currency_not_supported(self):
         # Prepare the test data
         test_data = {
@@ -121,10 +169,17 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'WTF is not supported!')
 
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
     def test_conversion_endpoint_with_external_API_failure(self):
         # Prepare the test data
         test_data = {
@@ -139,9 +194,14 @@ class TestConversionEndpoint(unittest.TestCase):
             # Send a POST request to the conversion endpoint
             response = self.app.post('/convert', json=test_data)
 
+            # assert communication
             self.assertEqual(response.status_code, 400)
             response_data = response.get_json()
             self.assertEqual(response_data['message'], 'failure getting exchange rate on the external API')
+
+            # assert persistency
+            dbh.create_tables.assert_not_called()
+            dbh.insert_transaction.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

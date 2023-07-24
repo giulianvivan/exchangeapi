@@ -1,11 +1,14 @@
 from datetime import datetime
 from flask import Flask, request, abort
 from flask_restful import Api, Resource
+from database import DatabaseHandler
 
 app = Flask(__name__)
 api = Api(app)
 
-# TODO: database setup
+# database setup
+dbh = DatabaseHandler()
+dbh.create_tables()
 
 # FIXME: temporarily hardcoded for easiness
 SUPPORTED_CURRENCIES = ('BRL', 'USD', 'EUR', 'JPY')
@@ -43,17 +46,25 @@ class ConversionResource(Resource):
 
         converted_amount = amount * exchange_rate
 
-        # TODO: save the transaction details into the database
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        transaction_id = dbh.insert_transaction(user_id,
+                                                source_currency,
+                                                amount,
+                                                target_currency,
+                                                converted_amount,
+                                                exchange_rate,
+                                                timestamp)
 
         return {
-            'transaction_id': 123, # TODO: replace with the actual transaction ID from the database
+            'transaction_id': transaction_id,
             'user_id': user_id,
             'source_currency': source_currency,
             'amount': amount,
             'target_currency': target_currency,
             'converted_amount': converted_amount,
             'exchange_rate': exchange_rate,
-            'timestamp': datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ") # TODO: replace with the timestamp from the database?
+            'timestamp': timestamp
         }, 200
 
 api.add_resource(ConversionResource, '/convert')
