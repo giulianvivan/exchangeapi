@@ -40,6 +40,34 @@ class DatabaseHandler:
 
         return transaction_id
 
+    def get_user_transactions(self, user_id):
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT * FROM transactions WHERE user_id = ?
+        ''', (user_id,))
+
+        raw_transactions = cursor.fetchall()
+
+        # Convert the fetched data to a list of dictionaries
+        transactions_dict_list = []
+        for t in raw_transactions:
+            transaction_dict = {
+                'transaction_id': t[0],
+                'user_id': t[1],
+                'source_currency': t[2],
+                'amount': t[3],
+                'target_currency': t[4],
+                'converted_amount': t[5],
+                'exchange_rate': t[6],
+                'timestamp': t[7]
+            }
+            transactions_dict_list.append(transaction_dict)
+
+        conn.close()
+        return transactions_dict_list
+
 if __name__ == '__main__':
     dbh = DatabaseHandler()
     dbh.create_tables()

@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify
 from flask_restful import Api, Resource
 from database import DatabaseHandler
 
@@ -67,4 +67,13 @@ class ConversionResource(Resource):
             'timestamp': timestamp
         }, 200
 
+class UserTransactionsResource(Resource):
+    def get(self, user_id):
+        # retrieve user transactions from the database
+        transactions = dbh.get_user_transactions(user_id)
+
+        # return the transactions as a list of dictionaries
+        return jsonify(transactions)
+
 api.add_resource(ConversionResource, '/convert')
+api.add_resource(UserTransactionsResource, '/transactions/<int:user_id>')

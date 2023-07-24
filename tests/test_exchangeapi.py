@@ -17,6 +17,7 @@ class TestConversionEndpoint(unittest.TestCase):
     @freeze_time("2023-07-24 22:30:00", tz_offset=-3)
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_success(self):
         # Prepare the test data
         test_data = {
@@ -52,9 +53,11 @@ class TestConversionEndpoint(unittest.TestCase):
                                                            140,
                                                            1.4,
                                                            '2023-07-24T19:30:00Z')
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_invalid_user(self):
         # Prepare the test data
         test_data = {
@@ -77,9 +80,11 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_negative_amount(self):
         # Prepare the test data
         test_data = {
@@ -102,9 +107,11 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_zero_amount(self):
         # Prepare the test data
         test_data = {
@@ -127,9 +134,11 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_source_currency_not_supported(self):
         # Prepare the test data
         test_data = {
@@ -152,9 +161,11 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_target_currency_not_supported(self):
         # Prepare the test data
         test_data = {
@@ -177,9 +188,11 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
 
     @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
     @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=[]))
     def test_conversion_endpoint_with_external_API_failure(self):
         # Prepare the test data
         test_data = {
@@ -202,6 +215,54 @@ class TestConversionEndpoint(unittest.TestCase):
             # assert persistency
             dbh.create_tables.assert_not_called()
             dbh.insert_transaction.assert_not_called()
+            dbh.get_user_transactions.assert_not_called()
+
+# FIXME: this would be better being local
+TEST_DATA = [
+            {
+                'transaction_id': 1,
+                'user_id': 1,
+                'source_currency': 'USD',
+                'amount': 100,
+                'target_currency': 'EUR',
+                'converted_amount': 85,
+                'exchange_rate': 0.85,
+                'timestamp': '2023-07-21T12:34:56Z'
+            },
+            {
+                'transaction_id': 2,
+                'user_id': 1,
+                'source_currency': 'EUR',
+                'amount': 50,
+                'target_currency': 'USD',
+                'converted_amount': 58.82,
+                'exchange_rate': 1.1764,
+                'timestamp': '2023-07-22T09:15:00Z'
+            }
+        ]
+
+class TestUserTransactionsEndpoint(unittest.TestCase):
+    def setUp(self):
+        self.app = app.test_client()
+
+    @patch.object(dbh, 'create_tables', MagicMock(return_value=None))
+    @patch.object(dbh, 'insert_transaction', MagicMock(return_value=TRANSACTION_ID))
+    @patch.object(dbh, 'get_user_transactions', MagicMock(return_value=TEST_DATA))
+    def test_user_transaction_endpoint_success(self):
+        user_id = 1
+
+        # send a GET request to the user transactions endpoint
+        response = self.app.get(f'/transactions/{user_id}')
+
+        # assert communication
+        self.assertEqual(response.status_code, 200)
+        response_data = response.get_json()
+        self.assertEqual(response_data, TEST_DATA)
+
+        # assert persistency
+        dbh.create_tables.assert_not_called()
+        dbh.insert_transaction.assert_not_called()
+        dbh.get_user_transactions.assert_called_once_with(1)
 
 if __name__ == '__main__':
     unittest.main()
