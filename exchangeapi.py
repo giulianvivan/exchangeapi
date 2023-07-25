@@ -1,3 +1,4 @@
+import requests, os
 from datetime import datetime
 from flask import Flask, request, abort, jsonify
 from flask_restful import Api, Resource
@@ -10,12 +11,37 @@ api = Api(app)
 dbh = DatabaseHandler()
 dbh.create_tables()
 
-SUPPORTED_CURRENCIES = ('BRL', 'USD', 'EUR', 'JPY')
 ALLOWED_USERS = { 1, 'John Doe',
                   2, 'Jane Doe' }
 
 def get_exchange_rate(source_currency, target_currency):
-    return 1.2
+    access_key = os.environ['ACCESS_KEY']
+
+    # the free API key allows only rates based on EUR (remove this
+    # check if your key is supports other currencies)
+    if source_currency != 'EUR':
+        raise ValueError(f"free API supports only EUR as base currency")
+
+    api_url = f'http://api.exchangeratesapi.io/latest?base={source_currency}&access_key={access_key}'
+
+    response = requests.get(api_url)
+
+    if response.status_code == 200:
+        response_data = response.json()
+
+        if response_data['success'] is True:
+            exchange_rate = response_data['rates'].get(target_currency)
+            if exchange_rate is not None:
+                return exchange_rate
+            else:
+                # 'target_currency' not found in the response data
+                raise ValueError(f"exchange rate for {target_currency} not available in the external API response")
+        else:
+            # API call failed by value
+            raise ValueError(f"failure getting exchange rate on the external API. Error: {response_data['error']}")
+    else:
+        # API call failed by status code
+        raise RuntimeError(f"failure getting exchange rate on the external API. Status Code: {response.status_code}")
 
 class ConversionResource(Resource):
     def post(self):
@@ -31,15 +57,10 @@ class ConversionResource(Resource):
         if not isinstance(amount, (int, float)) or amount <= 0:
             abort(400, description='Invalid amount. amount must be a positive number')
 
-        if source_currency not in SUPPORTED_CURRENCIES:
-            abort(400, description=f'{source_currency} is not supported!')
-
-        if target_currency not in SUPPORTED_CURRENCIES:
-            abort(400, description=f'{target_currency} is not supported!')
-
-        exchange_rate = get_exchange_rate(source_currency, target_currency)
-        if not isinstance(exchange_rate, (int, float)):
-            abort(400, description='failure getting exchange rate on the external API')
+        try:
+            exchange_rate = get_exchange_rate(source_currency, target_currency)
+        except Exception as e:
+            abort(400, description=f'{e}')
 
         converted_amount = amount * exchange_rate
 
