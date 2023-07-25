@@ -217,7 +217,6 @@ class TestConversionEndpoint(unittest.TestCase):
             dbh.insert_transaction.assert_not_called()
             dbh.get_user_transactions.assert_not_called()
 
-# FIXME: this would be better being local
 TEST_DATA = [
             {
                 'transaction_id': 1,

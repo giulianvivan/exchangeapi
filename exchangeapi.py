@@ -10,14 +10,11 @@ api = Api(app)
 dbh = DatabaseHandler()
 dbh.create_tables()
 
-# FIXME: temporarily hardcoded for easiness
 SUPPORTED_CURRENCIES = ('BRL', 'USD', 'EUR', 'JPY')
 ALLOWED_USERS = { 1, 'John Doe',
                   2, 'Jane Doe' }
 
 def get_exchange_rate(source_currency, target_currency):
-    # TODO: implement the requests to http://api.exchangeratesapi.io/latest?base=EUR
-    # for now, returning a fixed 1.2 rate
     return 1.2
 
 class ConversionResource(Resource):
